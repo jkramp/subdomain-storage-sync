@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross-Domain Storage Sync - Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .buttons {
+            margin: 10px 0;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        .status {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .log {
+            background: #333;
+            color: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cross-Domain Storage Sync - Test Page</h1>
+    
+    <div class="status">
+        <strong>Current Domain:</strong> <span id="current-domain"></span><br>
+        <strong>Parent Domain:</strong> <span id="parent-domain"></span><br>
+        <strong>Library Status:</strong> <span id="library-status"></span><br>
+        <strong>Version:</strong> <span id="version"></span>
+    </div>
+
+    <div class="container">
+        <h2>Configuration</h2>
+        <label>
+            Storage Type: 
+            <select id="storage-type">
+                <option value="localStorage">localStorage</option>
+                <option value="sessionStorage">sessionStorage</option>
+                <option value="both">both</option>
+            </select>
+        </label>
+        <label>
+            <input type="checkbox" id="overwrite-existing"> Overwrite existing keys
+        </label>
+        <label>
+            <input type="checkbox" id="debug-mode"> Debug mode
+        </label>
+        <div class="buttons">
+            <button onclick="applyConfig()">Apply Configuration</button>
+            <button onclick="reinitialize()">Reinitialize</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Storage Operations</h2>
+        <div>
+            <input type="text" id="key-input" placeholder="Key" value="testKey">
+            <input type="text" id="value-input" placeholder="Value" value="testValue">
+            <select id="storage-target">
+                <option value="localStorage">localStorage</option>
+                <option value="sessionStorage">sessionStorage</option>
+            </select>
+        </div>
+        <div class="buttons">
+            <button onclick="setStorageItem()">Set Item</button>
+            <button onclick="getStorageItem()">Get Item</button>
+            <button onclick="removeStorageItem()">Remove Item</button>
+            <button onclick="clearStorage()">Clear Storage</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Cookie Operations</h2>
+        <div>
+            <input type="text" id="cookie-key" placeholder="Key" value="testKey">
+            <input type="text" id="cookie-value" placeholder="Value" value="cookieValue">
+        </div>
+        <div class="buttons">
+            <button onclick="writeCookie()">Write Cookie</button>
+            <button onclick="readCookie()">Read Cookie</button>
+            <button onclick="deleteCookie()">Delete Cookie</button>
+            <button onclick="getAllCookies()">Get All Sync Cookies</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Manual Sync</h2>
+        <div class="buttons">
+            <button onclick="syncCookiesToStorage()">Sync Cookies to Storage</button>
+            <button onclick="showCurrentStorage()">Show Current Storage</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Log Output</h2>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <!-- Load the storage sync library -->
+    <script src="src/index.js"></script>
+    
+    <script>
+        // Override console methods to capture logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function logToDiv(message, type = 'log') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.textContent += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logToDiv(args.join(' '), 'log');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logToDiv(args.join(' '), 'error');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            logToDiv(args.join(' '), 'warn');
+        };
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus();
+            loadCurrentConfig();
+            logToDiv('Test page loaded');
+        });
+
+        function updateStatus() {
+            document.getElementById('current-domain').textContent = window.location.hostname;
+            document.getElementById('parent-domain').textContent = getParentDomain();
+            document.getElementById('library-status').textContent = 
+                StorageSync.isInitialized() ? 'Initialized ✓' : 'Not Initialized ✗';
+            document.getElementById('version').textContent = StorageSync.version;
+        }
+
+        function getParentDomain() {
+            const hostname = window.location.hostname;
+            if (hostname === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+                return hostname;
+            }
+            const parts = hostname.split('.');
+            return parts.length > 2 ? '.' + parts.slice(-2).join('.') : '.' + hostname;
+        }
+
+        function loadCurrentConfig() {
+            document.getElementById('storage-type').value = StorageSync.config.storageType;
+            document.getElementById('overwrite-existing').checked = StorageSync.config.overwriteExisting;
+            document.getElementById('debug-mode').checked = StorageSync.config.debug;
+        }
+
+        function applyConfig() {
+            StorageSync.config.storageType = document.getElementById('storage-type').value;
+            StorageSync.config.overwriteExisting = document.getElementById('overwrite-existing').checked;
+            StorageSync.config.debug = document.getElementById('debug-mode').checked;
+            logToDiv('Configuration updated');
+        }
+
+        function reinitialize() {
+            const success = StorageSync.reinitialize();
+            logToDiv(`Reinitialization ${success ? 'successful' : 'failed'}`);
+            updateStatus();
+        }
+
+        function setStorageItem() {
+            const key = document.getElementById('key-input').value;
+            const value = document.getElementById('value-input').value;
+            const storageType = document.getElementById('storage-target').value;
+            
+            if (!key) {
+                logToDiv('Please enter a key', 'error');
+                return;
+            }
+            
+            try {
+                window[storageType].setItem(key, value);
+                logToDiv(`Set ${storageType}["${key}"] = "${value}"`);
+            } catch (error) {
+                logToDiv(`Error setting ${storageType} item: ${error.message}`, 'error');
+            }
+        }
+
+        function getStorageItem() {
+            const key = document.getElementById('key-input').value;
+            const storageType = document.getElementById('storage-target').value;
+            
+            if (!key) {
+                logToDiv('Please enter a key', 'error');
+                return;
+            }
+            
+            try {
+                const value = window[storageType].getItem(key);
+                logToDiv(`Get ${storageType}["${key}"] = "${value}"`);
+            } catch (error) {
+                logToDiv(`Error getting ${storageType} item: ${error.message}`, 'error');
+            }
+        }
+
+        function removeStorageItem() {
+            const key = document.getElementById('key-input').value;
+            const storageType = document.getElementById('storage-target').value;
+            
+            if (!key) {
+                logToDiv('Please enter a key', 'error');
+                return;
+            }
+            
+            try {
+                window[storageType].removeItem(key);
+                logToDiv(`Removed ${storageType}["${key}"]`);
+            } catch (error) {
+                logToDiv(`Error removing ${storageType} item: ${error.message}`, 'error');
+            }
+        }
+
+        function clearStorage() {
+            const storageType = document.getElementById('storage-target').value;
+            
+            try {
+                window[storageType].clear();
+                logToDiv(`Cleared all ${storageType} items`);
+            } catch (error) {
+                logToDiv(`Error clearing ${storageType}: ${error.message}`, 'error');
+            }
+        }
+
+        function writeCookie() {
+            const key = document.getElementById('cookie-key').value;
+            const value = document.getElementById('cookie-value').value;
+            
+            if (!key) {
+                logToDiv('Please enter a key', 'error');
+                return;
+            }
+            
+            const success = StorageSync.writeToCookie(key, value);
+            logToDiv(`Write cookie "${key}" = "${value}": ${success ? 'success' : 'failed'}`);
+        }
+
+        function readCookie() {
+            const key = document.getElementById('cookie-key').value;
+            
+            if (!key) {
+                logToDiv('Please enter a key', 'error');
+                return;
+            }
+            
+            const value = StorageSync.readFromCookie(key);
+            logToDiv(`Read cookie "${key}" = "${value}"`);
+        }
+
+        function deleteCookie() {
+            const key = document.getElementById('cookie-key').value;
+            
+            if (!key) {
+                logToDiv('Please enter a key', 'error');
+                return;
+            }
+            
+            const success = StorageSync.deleteFromCookie(key);
+            logToDiv(`Delete cookie "${key}": ${success ? 'success' : 'failed'}`);
+        }
+
+        function getAllCookies() {
+            const cookies = StorageSync.getAllSyncCookies();
+            logToDiv(`All sync cookies: ${JSON.stringify(cookies, null, 2)}`);
+        }
+
+        function syncCookiesToStorage() {
+            StorageSync.syncCookiesToStorage();
+            logToDiv('Manual sync from cookies to storage triggered');
+        }
+
+        function showCurrentStorage() {
+            const localStorage = {};
+            const sessionStorage = {};
+            
+            for (let i = 0; i < window.localStorage.length; i++) {
+                const key = window.localStorage.key(i);
+                localStorage[key] = window.localStorage.getItem(key);
+            }
+            
+            for (let i = 0; i < window.sessionStorage.length; i++) {
+                const key = window.sessionStorage.key(i);
+                sessionStorage[key] = window.sessionStorage.getItem(key);
+            }
+            
+            logToDiv(`localStorage: ${JSON.stringify(localStorage, null, 2)}`);
+            logToDiv(`sessionStorage: ${JSON.stringify(sessionStorage, null, 2)}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+    </script>
+</body>
+</html>
