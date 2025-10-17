@@ -595,8 +595,8 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 ### Development Setup
 
 ```bash
-git clone https://github.com/yourusername/cross-domain-storage-sync.git
-cd cross-domain-storage-sync
+git clone https://github.com/jkramp/subdomain-storage-sync.git
+cd subdomain-storage-sync
 npm install
 npm run build
 ```
@@ -607,9 +607,9 @@ npm run build
 
 ## 🆘 Support
 
-- **Documentation**: [GitHub Wiki](https://github.com/yourusername/cross-domain-storage-sync/wiki)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/cross-domain-storage-sync/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/cross-domain-storage-sync/discussions)
+- **Documentation**: [GitHub Wiki](https://github.com/jkramp/subdomain-storage-sync/wiki)
+- **Issues**: [GitHub Issues](https://github.com/jkramp/subdomain-storage-sync/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/jkramp/subdomain-storage-sync/discussions)
 
 ---
 
